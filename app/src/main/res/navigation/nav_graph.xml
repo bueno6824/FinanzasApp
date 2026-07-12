@@ -1,0 +1,33 @@
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/dashboardFragment">
+
+    <fragment
+        android:id="@+id/dashboardFragment"
+        android:name="com.example.finanzasapp.ui.dashboard.DashboardFragment"
+        android:label="Dashboard">
+    <action
+        android:id="@+id/action_dashboard_to_mayor"
+        app:destination="@id/mayorFragment"
+        app:launchSingleTop="true"
+        app:popUpTo="@id/dashboardFragment"
+        app:popUpToInclusive="false"/>
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/movimientosFragment"
+        android:name="com.example.finanzasapp.ui.diario.MovimientosFragment"
+        android:label="Movimientos"/>
+
+    <fragment
+        android:id="@+id/mayorFragment"
+        android:name="com.example.finanzasapp.ui.mayor.MayorFragment"
+        android:label="Mayor">
+    <action
+        android:id="@+id/action_mayorFragment_to_movimientosFragment"
+        app:destination="@id/movimientosFragment" />
+    </fragment>
+
+</navigation>

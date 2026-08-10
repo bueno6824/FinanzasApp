@@ -6,6 +6,7 @@
     >
 
     <LinearLayout
+        android:id="@+id/agregarMovimientoFragment"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -15,11 +16,11 @@
             android:id="@+id/tvTitulo"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:text="Nuevo Movimiento"
-            android:textSize="24sp"
-            android:textStyle="bold"
             android:layout_marginBottom="24dp"
-            android:textAlignment="center"/>
+            android:text="Nuevo Movimiento"
+            android:textAlignment="center"
+            android:textSize="24sp"
+            android:textStyle="bold" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -52,29 +53,28 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
             android:text="Categoría"
-            android:textSize="14sp"
-            android:layout_marginBottom="8dp"/>
+            android:textSize="14sp" />
 
         <Spinner
             android:id="@+id/spinnerCategoria"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
             android:text="Tipo de Movimiento"
-            android:textSize="14sp"
-            android:layout_marginBottom="8dp"/>
+            android:textSize="14sp" />
 
         <Spinner
             android:id="@+id/spinnerTipo"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginBottom="32dp"
-            />
+            android:layout_marginBottom="32dp" />
 
         <Button
             android:id="@+id/btnGuardar"

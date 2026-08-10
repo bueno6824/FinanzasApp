@@ -17,74 +17,91 @@ import java.util.Locale
 
 object BackupManager {
     private const val TAG = "BackupManager"
-
+        // EXPORTAR (Ahorra usa MediaStore como el ExcelExporter)
     fun exportarBaseDeDatos(context: Context, nombreBaseDatos: String) {
         try {
-            // 1. Cerrar la base de datos para asegurar que los datos se escriban en el archivo .db
-            com.example.finanzasapp.data.local.AppDatabase.cerrarDatabase()
-
+            // Ya no cerramos la DB Room permite copiar el archivo mientras está abierto
+            // Si la app está escribiendo, Room usa bloqueos para evitar corrupción
             val dbFile: File = context.getDatabasePath(nombreBaseDatos)
             if (!dbFile.exists()) {
                 Toast.makeText(context, "No hay datos para respaldar", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            val fecha = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+
+            val fecha = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val nombreBackup = "Backup_Finanzas_$fecha.db"
 
-            // 🔥 CORRECCIÓN AQUÍ: Usar la carpeta pública de Descargas
-            val carpetaDescargas = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-            val destino = File(carpetaDescargas, nombreBackup)
+            // Usamos MediaStore (igual que en Excel)
+            val resolver = context.contentResolver
 
-            // 2. Copiar los datos
-            FileInputStream(dbFile).use { input ->
-                FileOutputStream(destino).use { output ->
-                    input.copyTo(output)
+            val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            } else {
+                // Para android 9 o menos, este es un fallback pero necesitaras permisos WRITE_EXTERNAL_STORAGE
+                MediaStore.Files.getContentUri("external")
+            }
+
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, nombreBackup)
+                put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/FinanzasApp")
                 }
             }
 
-            // 3. Notificar al sistema para que el archivo sea VISIBLE en el explorador
-            android.media.MediaScannerConnection.scanFile(
-                context,
-                arrayOf(destino.absolutePath),
-                null
-            ) { path, uri ->
-                Log.d(TAG, "Archivo escaneado y visible en: $path")
+            val uri = resolver.insert(collection, contentValues)
+
+            uri?.let { outputUri ->
+                resolver.openOutputStream(outputUri)?.use { outputStream ->
+                    FileInputStream(dbFile).use { inputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+                Toast.makeText(
+                    context,
+                    "✅ Respaldo guardado en Descargas/FinanzasApp",
+                    Toast.LENGTH_LONG
+                ).show()
+                //Opcional: compartir
+                compartirBackup(context, outputUri)
+            } ?: run {
+                Toast.makeText(
+                    context,
+                    "❎ Error al crear el archivo en MediaStore",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
-
-            Toast.makeText(context, "Respaldo creado en Descargas", Toast.LENGTH_LONG).show()
-
-            // 4. Compartir usando FileProvider
-            val uri = androidx.core.content.FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.provider",
-                destino
-            )
-            compartirBackup(context, uri)
-
         } catch (e: Exception) {
-            Log.e(TAG, "Error en exportar: ${e.message}")
-            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.e(TAG, "Error en exportar: ${e.message}", e)
+            Toast.makeText(context, "❎ Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // La función de restaurar se mantiene igual, pero recuerda cerrar la DB antes de llamar a restaurar
+
+    // RESTAURAR (Corregida: borrará archivos viejos ANTES de copiar)
     fun restaurarBaseDeDatos(context: Context, uriSeleccionada: Uri, nombreBaseDatos: String): Boolean {
         return try {
+            // Cerramos la DB para liberar el archivo (Necesario al restaurar)
             com.example.finanzasapp.data.local.AppDatabase.cerrarDatabase()
             val dbFile = context.getDatabasePath(nombreBaseDatos)
 
+            // Eliminar los archivos viejos ANTES de copiar
+            if(dbFile.exists()){
+                dbFile.delete()
+            }
+
+            // Copiamos en nuevo archivo
             context.contentResolver.openInputStream(uriSeleccionada)?.use { input ->
                 FileOutputStream(dbFile).use { output ->
                     input.copyTo(output)
+                    output.flush()
                 }
-            }
+            }?: return false
 
-            // Borrar temporales
-            File(dbFile.path + "-wal").delete()
-            File(dbFile.path + "-shm").delete()
             true
         } catch (e: Exception) {
+            Log.e(TAG, "Error al restaurar: ${e.message}", e)
             false
         }
     }

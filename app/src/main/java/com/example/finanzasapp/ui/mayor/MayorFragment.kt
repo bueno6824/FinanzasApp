@@ -26,6 +26,7 @@ import com.example.finanzasapp.ui.util.ExcelExporter
 import com.example.finanzasapp.ui.util.applyTopSystemInset
 import com.example.finanzasapp.util.NotificationWorker
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
+import com.example.finanzasapp.ui.util.DateRangeUtils
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -269,51 +270,61 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
     // --- Métodos de Filtro (Sin cambios en lógica) ---
     private fun actualizarFiltroGlobal() {
-        val cal = Calendar.getInstance()
-        val desde: Long;
-        val hasta: Long
-        if (mesSeleccionado == null) {
-            cal.set(anioSeleccionado, 0, 1, 0, 0, 0); desde = cal.timeInMillis
-            cal.set(anioSeleccionado, 11, 31, 23, 59, 59); hasta = cal.timeInMillis
-        } else {
-            cal.set(anioSeleccionado, mesSeleccionado!!, 1, 0, 0, 0); desde = cal.timeInMillis
-            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-            cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); hasta =
-                cal.timeInMillis
-        }
-        viewModel.actualizarFiltro(desde, hasta)
+
+        val rango =
+            if (mesSeleccionado == null) {
+                DateRangeUtils.anio(
+                    anioSeleccionado
+                )
+            } else {
+                DateRangeUtils.mes(
+                    anioSeleccionado,
+                    mesSeleccionado!!
+                )
+            }
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
     }
 
     private fun aplicarFiltroHoy() {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        val d = cal.timeInMillis
-        cal.set(Calendar.HOUR_OF_DAY, 23);
-        val h = cal.timeInMillis
-        viewModel.actualizarFiltro(d, h)
+
+        val rango =
+            DateRangeUtils.hoy()
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
     }
 
     private fun aplicarFiltroSemana() {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek);
-        val d = cal.timeInMillis
-        cal.add(Calendar.DAY_OF_WEEK, 6);
-        val h = cal.timeInMillis
-        viewModel.actualizarFiltro(d, h)
+
+        val rango =
+            DateRangeUtils.semanaActual()
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
     }
 
     private fun aplicarFiltroMesActual() {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_MONTH, 1);
-        val d = cal.timeInMillis
-        cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
-        val h = cal.timeInMillis
-        viewModel.actualizarFiltro(d, h)
+
+        val rango =
+            DateRangeUtils.mesActual()
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
     }
 
     private fun programarRecordatorio() {
         val request = PeriodicWorkRequestBuilder<NotificationWorker>(
-            8, TimeUnit.HOURS // Se ejecutará cada 8 horas
+            3, TimeUnit.HOURS // Se ejecutará cada 8 horas
         ).build()
 
         WorkManager.getInstance(requireContext()).enqueueUniquePeriodicWork(

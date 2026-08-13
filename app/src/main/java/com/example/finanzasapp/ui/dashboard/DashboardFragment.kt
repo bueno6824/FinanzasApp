@@ -37,6 +37,8 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Calendar
 import java.util.Locale
+import com.example.finanzasapp.ui.util.DateRangeUtils
+import java.time.LocalDate
 
 class DashboardFragment : Fragment(R.layout.activity_dashboard) {
 
@@ -150,23 +152,32 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
             .show()
     }
 
-    private fun enviarFiltroAlViewModel(position: Int) {
-        val mes = if (position == 0) null else position - 1
-        val cal = Calendar.getInstance()
-        if (mes == null) {
-            cal.set(Calendar.MONTH, 0)
-            cal.set(Calendar.DAY_OF_MONTH, 1)
-            val desde = cal.timeInMillis
-            cal.set(Calendar.MONTH, 11)
-            cal.set(Calendar.DAY_OF_MONTH, 31)
-            viewModel.actualizarFiltro(desde, cal.timeInMillis)
-        } else {
-            cal.set(Calendar.MONTH, mes)
-            cal.set(Calendar.DAY_OF_MONTH, 1)
-            val desde = cal.timeInMillis
-            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-            viewModel.actualizarFiltro(desde, cal.timeInMillis)
-        }
+    private fun enviarFiltroAlViewModel(
+        position: Int
+    ) {
+
+        val anioActual =
+            LocalDate.now().year
+
+        val rango =
+            if (position == 0) {
+
+                DateRangeUtils.anio(
+                    anioActual
+                )
+
+            } else {
+
+                DateRangeUtils.mes(
+                    anioActual,
+                    position - 1
+                )
+            }
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
     }
 
     private fun refrescarGrafica() {

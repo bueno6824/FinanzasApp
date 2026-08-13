@@ -79,7 +79,8 @@ dependencies {
 
     implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
 
-
+    // Notificaciones
+    implementation ("androidx.work:work-runtime-ktx:2.11.2")
 
 
 
@@ -111,8 +112,7 @@ dependencies {
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
 
-    // Notificaciones
-    implementation ("androidx.work:work-runtime-ktx:2.8.1")
+
     //Exportarcion a Excel
     // Exportación a Excel - Versión compatible con Android
     implementation("org.apache.poi:poi-ooxml:5.2.3")

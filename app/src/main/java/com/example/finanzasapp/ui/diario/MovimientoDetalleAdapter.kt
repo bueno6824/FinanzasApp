@@ -9,9 +9,11 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.finanzasapp.R
 import com.example.finanzasapp.data.model.Movimiento
+import com.example.finanzasapp.ui.util.MoneyFormatter
 
-class MovimientoDetalleAdapter(private val listener: OnMovimientoClickListener) :
-    RecyclerView.Adapter<MovimientoDetalleAdapter.ViewHolder>() {
+class MovimientoDetalleAdapter(
+    private val listener: OnMovimientoClickListener
+) : RecyclerView.Adapter<MovimientoDetalleAdapter.ViewHolder>() {
 
     interface OnMovimientoClickListener {
         fun onEdit(movimiento: Movimiento)
@@ -20,32 +22,103 @@ class MovimientoDetalleAdapter(private val listener: OnMovimientoClickListener) 
 
     private var lista = listOf<Movimiento>()
 
-    fun actualizar(nueva: List<Movimiento>) {
+    fun actualizar(
+        nueva: List<Movimiento>
+    ) {
         lista = nueva
         notifyDataSetChanged()
     }
 
-    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val txtDesc: TextView = view.findViewById(R.id.txtDescripcion)
-        val txtCat: TextView = view.findViewById(R.id.txtCategoria)
-        val txtMonto: TextView = view.findViewById(R.id.txtMonto)
-        val btnEdit: ImageButton = view.findViewById(R.id.btnEditar)
-        val btnDelete: ImageButton = view.findViewById(R.id.btnEliminar)
+    class ViewHolder(
+        view: View
+    ) : RecyclerView.ViewHolder(view) {
+
+        val txtDesc: TextView =
+            view.findViewById(R.id.txtDescripcion)
+
+        val txtCat: TextView =
+            view.findViewById(R.id.txtCategoria)
+
+        val txtMonto: TextView =
+            view.findViewById(R.id.txtMonto)
+
+        val btnEdit: ImageButton =
+            view.findViewById(R.id.btnEditar)
+
+        val btnDelete: ImageButton =
+            view.findViewById(R.id.btnEliminar)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        ViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_movimiento, parent, false))
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int
+    ): ViewHolder {
 
-    override fun getItemCount() = lista.size
+        val view =
+            LayoutInflater
+                .from(parent.context)
+                .inflate(
+                    R.layout.item_movimiento,
+                    parent,
+                    false
+                )
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val mov = lista[position]
-        holder.txtDesc.text = mov.descripcion
-        holder.txtCat.text = mov.categoria
-        holder.txtMonto.text = String.format("$%,.2f", mov.monto)
-        holder.txtMonto.setTextColor(if(mov.tipo == "ingreso") Color.parseColor("#10B981") else Color.parseColor("#EF4444"))
+        return ViewHolder(view)
+    }
 
-        holder.btnEdit.setOnClickListener { listener.onEdit(mov) }
-        holder.btnDelete.setOnClickListener { listener.onDelete(mov) }
+    override fun getItemCount(): Int {
+        return lista.size
+    }
+
+    override fun onBindViewHolder(
+        holder: ViewHolder,
+        position: Int
+    ) {
+        val movimiento = lista[position]
+
+        holder.txtDesc.text =
+            movimiento.descripcion
+
+        holder.txtCat.text =
+            movimiento.categoria
+
+        holder.txtMonto.text =
+            MoneyFormatter.movimiento(
+                monto = movimiento.monto,
+                tipo = movimiento.tipo
+            )
+
+        configurarColorMonto(
+            holder = holder,
+            tipo = movimiento.tipo
+        )
+
+        holder.btnEdit.setOnClickListener {
+            listener.onEdit(movimiento)
+        }
+
+        holder.btnDelete.setOnClickListener {
+            listener.onDelete(movimiento)
+        }
+    }
+
+    private fun configurarColorMonto(
+        holder: ViewHolder,
+        tipo: String
+    ) {
+        val esIngreso =
+            tipo.equals(
+                other = "ingreso",
+                ignoreCase = true
+            )
+
+        val colorMonto =
+            if (esIngreso) {
+                Color.parseColor("#10B981")
+            } else {
+                Color.parseColor("#EF4444")
+            }
+
+        holder.txtMonto.setTextColor(colorMonto)
     }
 }

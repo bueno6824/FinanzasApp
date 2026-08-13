@@ -1,7 +1,5 @@
 package com.example.finanzasapp.ui.mayor
 
-import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,8 +13,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.example.finanzasapp.R
 import com.example.finanzasapp.data.model.Movimiento
 import com.example.finanzasapp.databinding.ActivityLibroMayorBinding
@@ -25,14 +21,11 @@ import com.example.finanzasapp.ui.resumen.ResumenAdapter
 import com.example.finanzasapp.ui.util.DateRange
 import com.example.finanzasapp.ui.util.ExcelExporter
 import com.example.finanzasapp.ui.util.applyTopSystemInset
-import com.example.finanzasapp.util.NotificationWorker
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
 import com.example.finanzasapp.ui.util.DateRangeUtils
 import kotlinx.coroutines.launch
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 import androidx.lifecycle.Observer
-import androidx.work.ExistingPeriodicWorkPolicy
 
 class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.OnItemActionListener {
 
@@ -107,7 +100,6 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
         actualizarFiltroGlobal()
 
-        programarRecordatorio() // Esto activa la programación silenciosamente
 
         // Configurar el botón de Excel
         binding.btnExportarExcel.setOnClickListener {
@@ -470,24 +462,5 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
             nombreFiltro = "Mes_Actual"
         )
     }
-
-    private fun programarRecordatorio() {
-
-        val request =
-            PeriodicWorkRequestBuilder<NotificationWorker>(
-                24,
-                TimeUnit.HOURS
-            ).build()
-
-        WorkManager
-            .getInstance(requireContext())
-            .enqueueUniquePeriodicWork(
-                "RecordatorioDiario",
-                ExistingPeriodicWorkPolicy.UPDATE,
-                request
-            )
-    }
-
-
 
 }

@@ -7,13 +7,17 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.finanzasapp.R
 import com.example.finanzasapp.ui.util.MoneyFormatter
 
 class ResumenAdapter(
     private val listener: OnItemActionListener
-) : RecyclerView.Adapter<ResumenAdapter.ViewHolder>() {
+) : ListAdapter<ResumenAdapter.ResumenItem, ResumenAdapter.ViewHolder>(
+    DIFF_CALLBACK
+) {
 
     interface OnItemActionListener {
         fun onEdit(item: ResumenItem)
@@ -26,13 +30,32 @@ class ResumenAdapter(
         val gastos: Double
     )
 
-    private var lista = listOf<ResumenItem>()
+    companion object {
+
+        private val DIFF_CALLBACK =
+            object : DiffUtil.ItemCallback<ResumenItem>() {
+
+                override fun areItemsTheSame(
+                    oldItem: ResumenItem,
+                    newItem: ResumenItem
+                ): Boolean {
+                    return oldItem.categoria ==
+                            newItem.categoria
+                }
+
+                override fun areContentsTheSame(
+                    oldItem: ResumenItem,
+                    newItem: ResumenItem
+                ): Boolean {
+                    return oldItem == newItem
+                }
+            }
+    }
 
     fun actualizar(
         nueva: List<ResumenItem>
     ) {
-        lista = nueva
-        notifyDataSetChanged()
+        submitList(nueva)
     }
 
     class ViewHolder(
@@ -66,15 +89,11 @@ class ResumenAdapter(
         return ViewHolder(view)
     }
 
-    override fun getItemCount(): Int {
-        return lista.size
-    }
-
     override fun onBindViewHolder(
         holder: ViewHolder,
         position: Int
     ) {
-        val item = lista[position]
+        val item = getItem(position)
         val balance = item.ingresos - item.gastos
 
         configurarCategoria(

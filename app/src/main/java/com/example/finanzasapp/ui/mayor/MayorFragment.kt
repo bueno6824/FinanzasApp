@@ -201,55 +201,145 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
         mostrarDialogoSeleccion(item.categoria)
     }
 
-    private fun mostrarDialogoSeleccion(categoria: String) {
+    private fun mostrarDialogoSeleccion(
+        categoria: String
+    ) {
         val dialogView =
-            LayoutInflater.from(requireContext()).inflate(R.layout.dialog_lista_detalle, null)
-        val rvDetalle = dialogView.findViewById<RecyclerView>(R.id.rvDetalle)
-        val tvTitulo = dialogView.findViewById<TextView>(R.id.txtTituloDialogo)
+            LayoutInflater
+                .from(requireContext())
+                .inflate(
+                    R.layout.dialog_lista_detalle,
+                    null
+                )
 
-        tvTitulo?.text = "Movimientos: $categoria"
+        val rvDetalle =
+            dialogView.findViewById<RecyclerView>(
+                R.id.rvDetalle
+            )
 
-        val dialog = AlertDialog.Builder(requireContext(), R.style.CustomDialogTheme)
-            .setView(dialogView)
-            .create()
+        val tvTitulo =
+            dialogView.findViewById<TextView>(
+                R.id.txtTituloDialogo
+            )
 
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        tvTitulo?.text =
+            "Movimientos: $categoria"
+
+        val dialog =
+            AlertDialog.Builder(
+                requireContext(),
+                R.style.CustomDialogTheme
+            )
+                .setView(dialogView)
+                .create()
+
+        // NUEVO:
+        // Permite distinguir entre cerrar el diálogo
+        // normalmente y cerrarlo para abrir la edición.
+        var navegandoAEdicion = false
+
+        dialog.window?.setBackgroundDrawableResource(
+            android.R.color.transparent
+        )
 
         dialog.setOnDismissListener {
-            if (arguments?.containsKey("categoria_filtro") == true) {
-                arguments?.remove("categoria_filtro")
-                findNavController().popBackStack(R.id.dashboardFragment, false)
+
+            // NUEVO:
+            // Solo regresa al Dashboard si el cierre
+            // no fue provocado por el botón Editar.
+            if (
+                !navegandoAEdicion &&
+                arguments?.containsKey(
+                    "categoria_filtro"
+                ) == true
+            ) {
+                arguments?.remove(
+                    "categoria_filtro"
+                )
+
+                findNavController().popBackStack(
+                    R.id.dashboardFragment,
+                    false
+                )
             }
         }
 
         val detalleAdapter =
-            MovimientoDetalleAdapter(object : MovimientoDetalleAdapter.OnMovimientoClickListener {
-                override fun onEdit(movimiento: Movimiento) {
-                    dialog.dismiss()
-                    val bundle = Bundle().apply { putInt("movimientoId", movimiento.id) }
-                    findNavController().navigate(
-                        R.id.action_mayorFragment_to_agregarMovimientoFragment,
-                        bundle
-                    )
+            MovimientoDetalleAdapter(
+                object :
+                    MovimientoDetalleAdapter.OnMovimientoClickListener {
+
+                    override fun onEdit(
+                        movimiento: Movimiento
+                    ) {
+                        // NUEVO:
+                        // Debe cambiar a true antes de cerrar.
+                        navegandoAEdicion = true
+
+                        dialog.dismiss()
+
+                        val bundle =
+                            Bundle().apply {
+                                putInt(
+                                    "movimientoId",
+                                    movimiento.id
+                                )
+                            }
+
+                        findNavController().navigate(
+                            R.id.action_mayorFragment_to_agregarMovimientoFragment,
+                            bundle
+                        )
+                    }
+
+                    override fun onDelete(
+                        movimiento: Movimiento
+                    ) {
+                        AlertDialog.Builder(
+                            requireContext()
+                        )
+                            .setTitle("Confirmar")
+                            .setMessage(
+                                "¿Borrar '${movimiento.descripcion}'?"
+                            )
+                            .setPositiveButton("Sí") { _, _ ->
+                                viewModel.eliminar(
+                                    movimiento
+                                )
+                            }
+                            .setNegativeButton(
+                                "No",
+                                null
+                            )
+                            .show()
+                    }
+                }
+            )
+
+        rvDetalle.layoutManager =
+            LinearLayoutManager(
+                requireContext()
+            )
+
+        rvDetalle.adapter =
+            detalleAdapter
+
+        viewModel.movimientos.observe(
+            viewLifecycleOwner
+        ) { lista ->
+
+            val filtrados =
+                lista.filter {
+                    it.categoria == categoria
                 }
 
-                override fun onDelete(movimiento: Movimiento) {
-                    AlertDialog.Builder(requireContext())
-                        .setTitle("Confirmar")
-                        .setMessage("¿Borrar '${movimiento.descripcion}'?")
-                        .setPositiveButton("Sí") { _, _ -> viewModel.eliminar(movimiento) }
-                        .setNegativeButton("No", null)
-                        .show()
-                }
-            })
+            detalleAdapter.actualizar(
+                filtrados
+            )
 
-        rvDetalle.layoutManager = LinearLayoutManager(requireContext())
-        rvDetalle.adapter = detalleAdapter
-
-        viewModel.movimientos.observe(viewLifecycleOwner) { lista ->
-            val filtrados = lista.filter { it.categoria == categoria }
-            detalleAdapter.actualizar(filtrados)
-            if (filtrados.isEmpty()) dialog.dismiss()
+            if (filtrados.isEmpty()) {
+                dialog.dismiss()
+            }
         }
 
         dialog.show()

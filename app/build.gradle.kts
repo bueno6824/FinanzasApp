@@ -2,8 +2,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
-}
 
+}
 android {
     namespace = "com.example.finanzasapp"
     compileSdk = 36
@@ -20,7 +20,6 @@ android {
             useSupportLibrary = true
         }
     }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -31,17 +30,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-    // Agrega esto:
-    ksp {
-        arg("room.incremental", "true")
-        // Esto asegura que KSP use la configuración correcta
-    }
-    kotlin {
-        jvmToolchain(17) // 🔥 Esto fuerza a Kotlin y KSP a usar Java 17
-    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -52,10 +41,26 @@ android {
             excludes += "META-INF/LICENSE.txt"
         }
     }
-
     buildFeatures {
         viewBinding = true
     }
+
+}
+kotlin {
+    jvmToolchain(17)
+
+    compilerOptions {
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        )
+    }
+}
+
+ksp {
+    arg(
+        "room.schemaLocation",
+        "$projectDir/schemas"
+    )
 }
 
 dependencies {
@@ -69,10 +74,10 @@ dependencies {
 
 
     // ROOM (Base de datos) - Usa la misma versión para todo
-    val room_version = "2.6.1"
+    val room_version = "2.8.4"
     implementation("androidx.room:room-runtime:$room_version")
-    ksp("androidx.room:room-compiler:$room_version") // Antes tenías 2.8.4, cámbialo a 2.6.1
     implementation("androidx.room:room-ktx:$room_version")
+    ksp("androidx.room:room-compiler:$room_version")
 
 // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")

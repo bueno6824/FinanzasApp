@@ -30,7 +30,9 @@ import com.example.finanzasapp.viewmodel.MovimientoViewModel
 import com.example.finanzasapp.ui.util.DateRangeUtils
 import kotlinx.coroutines.launch
 import java.util.Calendar
-import java.util.concurrent.TimeUnit import androidx.lifecycle.Observer
+import java.util.concurrent.TimeUnit
+import androidx.lifecycle.Observer
+import androidx.work.ExistingPeriodicWorkPolicy
 
 class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.OnItemActionListener {
 
@@ -470,15 +472,20 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
     }
 
     private fun programarRecordatorio() {
-        val request = PeriodicWorkRequestBuilder<NotificationWorker>(
-            3, TimeUnit.HOURS // Se ejecutará cada 8 horas
-        ).build()
 
-        WorkManager.getInstance(requireContext()).enqueueUniquePeriodicWork(
-            "RecordatorioDiario",
-            androidx.work.ExistingPeriodicWorkPolicy.KEEP, // Mantiene el programa si ya existe
-            request
-        )
+        val request =
+            PeriodicWorkRequestBuilder<NotificationWorker>(
+                24,
+                TimeUnit.HOURS
+            ).build()
+
+        WorkManager
+            .getInstance(requireContext())
+            .enqueueUniquePeriodicWork(
+                "RecordatorioDiario",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                request
+            )
     }
 
 

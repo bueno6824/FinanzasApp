@@ -35,10 +35,9 @@ import com.github.mikephil.charting.highlight.Highlight
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
 import java.util.Calendar
-import java.util.Locale
 import com.example.finanzasapp.ui.util.DateRangeUtils
+import com.example.finanzasapp.ui.util.MoneyFormatter
 import java.time.LocalDate
 
 class DashboardFragment : Fragment(R.layout.activity_dashboard) {
@@ -155,14 +154,45 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
         }
 
         // --- OBSERVADORES ---
-        viewModel.movimientos.observe(viewLifecycleOwner) { lista ->
-            val ingresos = lista.filter { it.tipo == "ingreso" }.sumOf { it.monto }
-            val gastos = lista.filter { it.tipo == "gasto" }.sumOf { it.monto }
-            val formato = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+        viewModel.movimientos.observe(
+            viewLifecycleOwner
+        ) { lista ->
 
-            binding.txtBalance.text = formato.format(ingresos - gastos)
-            binding.txtIngresos.text = formato.format(ingresos)
-            binding.txtGastos.text = formato.format(gastos)
+            val ingresos =
+                lista
+                    .filter {
+                        it.tipo == "ingreso"
+                    }
+                    .sumOf {
+                        it.monto
+                    }
+
+            val gastos =
+                lista
+                    .filter {
+                        it.tipo == "gasto"
+                    }
+                    .sumOf {
+                        it.monto
+                    }
+
+            val balance =
+                ingresos - gastos
+
+            binding.txtBalance.text =
+                MoneyFormatter.moneda(
+                    balance
+                )
+
+            binding.txtIngresos.text =
+                MoneyFormatter.moneda(
+                    ingresos
+                )
+
+            binding.txtGastos.text =
+                MoneyFormatter.moneda(
+                    gastos
+                )
         }
 
         configurarEstiloInicialGrafica()

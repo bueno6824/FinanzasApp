@@ -22,6 +22,17 @@
         android:label="Movimientos" />
 
     <fragment
+        android:id="@+id/mayorFragment"
+        android:name="com.example.finanzasapp.ui.mayor.MayorFragment"
+        android:label="Libro Mayor">
+
+        <action
+            android:id="@+id/action_mayorFragment_to_movimientosFragment"
+            app:destination="@id/movimientosFragment" />
+
+    </fragment>
+
+    <fragment
         android:id="@+id/agregarMovimientoFragment"
         android:name="com.example.finanzasapp.ui.diario.AgregarMovimientoFragment"
         android:label="Agregar movimiento" />

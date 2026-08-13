@@ -8,8 +8,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Spinner
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
@@ -19,15 +17,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import androidx.navigation.navOptions
 import com.example.finanzasapp.MainActivity
 import com.example.finanzasapp.R
 import com.example.finanzasapp.databinding.ActivityDashboardBinding
 import com.example.finanzasapp.ui.util.BackupManager // 🔥 Asegúrate que la ruta sea correcta
+import com.example.finanzasapp.ui.util.applyTopSystemInset
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
 import com.github.mikephil.charting.animation.Easing
 import com.github.mikephil.charting.charts.PieChart
-import com.github.mikephil.charting.components.Legend
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
@@ -69,6 +66,8 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        binding.root.applyTopSystemInset()
 
         // Inicializamos la gráfica que es la única que requiere configuración especial
         pieChart = binding.pieChart
@@ -171,7 +170,7 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
     }
 
     private fun refrescarGrafica() {
-        val resumenActual = viewModel.resumenFiltrado.value ?: return
+        val resumenActual = viewModel.resumenFiltrado.value
         val tipoSeleccionado = binding.spinnerTipo.selectedItem.toString()
 
         val entries = resumenActual.mapNotNull {

@@ -23,6 +23,7 @@ import com.example.finanzasapp.databinding.ActivityLibroMayorBinding
 import com.example.finanzasapp.ui.diario.MovimientoDetalleAdapter
 import com.example.finanzasapp.ui.resumen.ResumenAdapter
 import com.example.finanzasapp.ui.util.ExcelExporter
+import com.example.finanzasapp.ui.util.applyTopSystemInset
 import com.example.finanzasapp.util.NotificationWorker
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
 import kotlinx.coroutines.launch
@@ -52,6 +53,7 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.root.applyTopSystemInset()
 
         val recycler = view.findViewById<RecyclerView>(R.id.recyclerMayor)
         val spinnerAnio = view.findViewById<Spinner>(R.id.spinnerAnio)

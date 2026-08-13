@@ -3,7 +3,7 @@ package com.example.finanzasapp.ui.diario
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
@@ -30,8 +30,8 @@ class MovimientoAdapter(
         val txtDescripcion: TextView = view.findViewById(R.id.txtDescripcion)
         val txtCategoria: TextView = view.findViewById(R.id.txtCategoria)
         val txtMonto : TextView = view.findViewById(R.id.txtMonto)
-        val btnEditar: Button = view.findViewById(R.id.btnEditar)
-        val btnEliminar: Button = view.findViewById(R.id.btnEliminar)
+        val btnEditar: ImageButton  = view.findViewById(R.id.btnEditar)
+        val btnEliminar: ImageButton  = view.findViewById(R.id.btnEliminar)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {

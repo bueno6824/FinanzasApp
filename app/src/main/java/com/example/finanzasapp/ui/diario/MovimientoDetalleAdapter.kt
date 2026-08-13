@@ -6,6 +6,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.finanzasapp.R
 import com.example.finanzasapp.data.model.Movimiento
@@ -13,20 +15,43 @@ import com.example.finanzasapp.ui.util.MoneyFormatter
 
 class MovimientoDetalleAdapter(
     private val listener: OnMovimientoClickListener
-) : RecyclerView.Adapter<MovimientoDetalleAdapter.ViewHolder>() {
+) : ListAdapter<
+        Movimiento,
+        MovimientoDetalleAdapter.ViewHolder
+        >(
+    DIFF_CALLBACK
+) {
 
     interface OnMovimientoClickListener {
         fun onEdit(movimiento: Movimiento)
         fun onDelete(movimiento: Movimiento)
     }
 
-    private var lista = listOf<Movimiento>()
+    companion object {
+
+        private val DIFF_CALLBACK =
+            object : DiffUtil.ItemCallback<Movimiento>() {
+
+                override fun areItemsTheSame(
+                    oldItem: Movimiento,
+                    newItem: Movimiento
+                ): Boolean {
+                    return oldItem.id == newItem.id
+                }
+
+                override fun areContentsTheSame(
+                    oldItem: Movimiento,
+                    newItem: Movimiento
+                ): Boolean {
+                    return oldItem == newItem
+                }
+            }
+    }
 
     fun actualizar(
         nueva: List<Movimiento>
     ) {
-        lista = nueva
-        notifyDataSetChanged()
+        submitList(nueva)
     }
 
     class ViewHolder(
@@ -66,15 +91,11 @@ class MovimientoDetalleAdapter(
         return ViewHolder(view)
     }
 
-    override fun getItemCount(): Int {
-        return lista.size
-    }
-
     override fun onBindViewHolder(
         holder: ViewHolder,
         position: Int
     ) {
-        val movimiento = lista[position]
+        val movimiento = getItem(position)
 
         holder.txtDesc.text =
             movimiento.descripcion
@@ -119,6 +140,8 @@ class MovimientoDetalleAdapter(
                 Color.parseColor("#EF4444")
             }
 
-        holder.txtMonto.setTextColor(colorMonto)
+        holder.txtMonto.setTextColor(
+            colorMonto
+        )
     }
 }

@@ -30,7 +30,7 @@ import com.example.finanzasapp.viewmodel.MovimientoViewModel
 import com.example.finanzasapp.ui.util.DateRangeUtils
 import kotlinx.coroutines.launch
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit import androidx.lifecycle.Observer
 
 class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.OnItemActionListener {
 
@@ -233,36 +233,7 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
                 .setView(dialogView)
                 .create()
 
-        // NUEVO:
-        // Permite distinguir entre cerrar el diálogo
-        // normalmente y cerrarlo para abrir la edición.
         var navegandoAEdicion = false
-
-        dialog.window?.setBackgroundDrawableResource(
-            android.R.color.transparent
-        )
-
-        dialog.setOnDismissListener {
-
-            // NUEVO:
-            // Solo regresa al Dashboard si el cierre
-            // no fue provocado por el botón Editar.
-            if (
-                !navegandoAEdicion &&
-                arguments?.containsKey(
-                    "categoria_filtro"
-                ) == true
-            ) {
-                arguments?.remove(
-                    "categoria_filtro"
-                )
-
-                findNavController().popBackStack(
-                    R.id.dashboardFragment,
-                    false
-                )
-            }
-        }
 
         val detalleAdapter =
             MovimientoDetalleAdapter(
@@ -272,8 +243,6 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
                     override fun onEdit(
                         movimiento: Movimiento
                     ) {
-                        // NUEVO:
-                        // Debe cambiar a true antes de cerrar.
                         navegandoAEdicion = true
 
                         dialog.dismiss()
@@ -324,25 +293,60 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
         rvDetalle.adapter =
             detalleAdapter
 
-        viewModel.movimientos.observe(
-            viewLifecycleOwner
-        ) { lista ->
+        val movimientosObserver =
+            Observer<List<Movimiento>> { lista ->
 
-            val filtrados =
-                lista.filter {
-                    it.categoria == categoria
+                val filtrados =
+                    lista.filter {
+                        it.categoria == categoria
+                    }
+
+                detalleAdapter.actualizar(
+                    filtrados
+                )
+
+                if (
+                    filtrados.isEmpty() &&
+                    dialog.isShowing
+                ) {
+                    dialog.dismiss()
                 }
+            }
 
-            detalleAdapter.actualizar(
-                filtrados
+        dialog.setOnDismissListener {
+
+            // El observador deja de existir al cerrar el diálogo.
+            viewModel.movimientos.removeObserver(
+                movimientosObserver
             )
 
-            if (filtrados.isEmpty()) {
-                dialog.dismiss()
+            if (
+                !navegandoAEdicion &&
+                arguments?.containsKey(
+                    "categoria_filtro"
+                ) == true
+            ) {
+                arguments?.remove(
+                    "categoria_filtro"
+                )
+
+                findNavController().popBackStack(
+                    R.id.dashboardFragment,
+                    false
+                )
             }
         }
 
         dialog.show()
+
+        dialog.window?.setBackgroundDrawableResource(
+            android.R.color.transparent
+        )
+
+        viewModel.movimientos.observe(
+            viewLifecycleOwner,
+            movimientosObserver
+        )
     }
 
     private fun configurarSpinners(spinnerAnio: Spinner, spinnerMes: Spinner) {

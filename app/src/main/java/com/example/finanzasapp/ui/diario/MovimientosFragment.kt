@@ -34,9 +34,9 @@ class MovimientosFragment :
             onEditar = { movimiento ->
 
                 val bundle = Bundle().apply {
-                    putSerializable(
-                        "movimiento",
-                        movimiento
+                    putInt(
+                        "movimientoId",
+                        movimiento.id
                     )
                 }
 

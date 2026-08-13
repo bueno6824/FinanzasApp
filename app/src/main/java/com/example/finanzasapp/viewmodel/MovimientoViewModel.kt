@@ -94,4 +94,37 @@ class MovimientoViewModel(application: Application) : AndroidViewModel(applicati
             repository.eliminarPorCategoria(categoria)
         }
     }
+
+    suspend fun obtenerPorId(id: Int): Movimiento? {
+        return repository.obtenerPorId(id)
+    }
+
+    fun restaurarMovimientos(
+        movimientos: List<Movimiento>,
+        onResultado: (Result<Int>) -> Unit
+    ) {
+
+        viewModelScope.launch {
+
+            val resultado =
+                kotlinx.coroutines.withContext(
+                    Dispatchers.IO
+                ) {
+
+                    runCatching {
+
+                        repository.restaurarMovimientos(
+                            movimientos
+                        )
+
+                        movimientos.size
+                    }
+                }
+
+            onResultado(resultado)
+        }
+    }
+
+
+
 }

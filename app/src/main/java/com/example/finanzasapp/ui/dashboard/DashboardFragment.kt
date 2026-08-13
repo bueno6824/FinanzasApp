@@ -3,6 +3,7 @@ package com.example.finanzasapp.ui.dashboard
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -76,11 +77,50 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
 
         // --- CONFIGURACIÓN DE BOTONES (BACKUP, RESTAURAR, TEMA) ---
         binding.btnBackup.setOnClickListener {
-            BackupManager.exportarBaseDeDatos(requireContext(), "finanzas_db")
+
+            val movimientos =
+                viewModel.movimientos.value
+                    ?: emptyList()
+
+            if (movimientos.isEmpty()) {
+
+                Toast.makeText(
+                    requireContext(),
+                    "No hay movimientos para respaldar",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                return@setOnClickListener
+            }
+
+            val exito =
+                BackupManager.exportar(
+                    requireContext(),
+                    movimientos
+                )
+
+            if (exito) {
+
+                Toast.makeText(
+                    requireContext(),
+                    "✅ Respaldo creado en Descargas/FinanzasApp",
+                    Toast.LENGTH_LONG
+                ).show()
+
+            } else {
+
+                Toast.makeText(
+                    requireContext(),
+                    "❌ No se pudo crear el respaldo",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
 
+
+
         binding.btnRestaurar.setOnClickListener {
-            seleccionarBackupLauncher.launch("*/*")
+            seleccionarBackupLauncher.launch("application/json")
         }
 
         binding.btnConfigTema.setOnClickListener {
@@ -136,19 +176,77 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
         }
     }
 
-    private fun confirmarRestauracion(uri: android.net.Uri) {
-        AlertDialog.Builder(requireContext())
-            .setTitle("¡Atención!")
-            .setMessage("Al restaurar, se borrarán todos los datos actuales. La app se reiniciará.\n\n¿Deseas continuar?")
-            .setPositiveButton("Restaurar") { _, _ ->
-                val exito = BackupManager.restaurarBaseDeDatos(requireContext(), uri, "finanzas_db")
-                if (exito) {
-                    android.os.Process.killProcess(android.os.Process.myPid())
-                } else {
-                    Toast.makeText(requireContext(), "Error al restaurar", Toast.LENGTH_SHORT).show()
+    private fun confirmarRestauracion(
+        uri: android.net.Uri
+    ) {
+
+        val movimientos =
+            BackupManager.leerBackup(
+                requireContext(),
+                uri
+            )
+
+        if (movimientos == null) {
+
+            Toast.makeText(
+                requireContext(),
+                "El archivo seleccionado no es un respaldo válido",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        AlertDialog
+            .Builder(requireContext())
+            .setTitle("Restaurar respaldo")
+            .setMessage(
+                "Se encontraron ${movimientos.size} movimientos.\n\n" +
+                        "Los datos actuales serán reemplazados. ¿Deseas continuar?"
+            )
+            .setPositiveButton(
+                "Restaurar"
+            ) { _, _ ->
+
+                viewModel.restaurarMovimientos(
+                    movimientos
+                ) { resultado ->
+
+                    resultado
+                        .onSuccess { cantidad ->
+
+                            context?.let { ctx ->
+
+                                Toast.makeText(
+                                    ctx,
+                                    "✅ $cantidad movimientos restaurados correctamente",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                        .onFailure { error ->
+
+                            Log.e(
+                                "FinanzasBackup",
+                                "Error al restaurar respaldo",
+                                error
+                            )
+
+                            context?.let { ctx ->
+
+                                Toast.makeText(
+                                    ctx,
+                                    "❌ Error al restaurar: ${error.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
                 }
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(
+                "Cancelar",
+                null
+            )
             .show()
     }
 
@@ -283,4 +381,7 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
         super.onResume()
         refrescarGrafica()
     }
+
+
+
 }

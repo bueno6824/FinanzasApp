@@ -226,7 +226,7 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
             MovimientoDetalleAdapter(object : MovimientoDetalleAdapter.OnMovimientoClickListener {
                 override fun onEdit(movimiento: Movimiento) {
                     dialog.dismiss()
-                    val bundle = Bundle().apply { putSerializable("movimiento", movimiento) }
+                    val bundle = Bundle().apply { putInt("movimientoId", movimiento.id) }
                     findNavController().navigate(
                         R.id.action_mayorFragment_to_agregarMovimientoFragment,
                         bundle

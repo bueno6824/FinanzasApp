@@ -6,6 +6,8 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.finanzasapp.R
 import com.example.finanzasapp.data.model.Movimiento
@@ -14,15 +16,35 @@ import com.example.finanzasapp.ui.util.MoneyFormatter
 class MovimientoAdapter(
     private val onEditar: (Movimiento) -> Unit,
     private val onEliminar: (Movimiento) -> Unit
-) : RecyclerView.Adapter<MovimientoAdapter.ViewHolder>() {
+) : ListAdapter<Movimiento, MovimientoAdapter.ViewHolder>(
+    DIFF_CALLBACK
+) {
 
-    private var lista = listOf<Movimiento>()
+    companion object {
+
+        private val DIFF_CALLBACK =
+            object : DiffUtil.ItemCallback<Movimiento>() {
+
+                override fun areItemsTheSame(
+                    oldItem: Movimiento,
+                    newItem: Movimiento
+                ): Boolean {
+                    return oldItem.id == newItem.id
+                }
+
+                override fun areContentsTheSame(
+                    oldItem: Movimiento,
+                    newItem: Movimiento
+                ): Boolean {
+                    return oldItem == newItem
+                }
+            }
+    }
 
     fun actualizarLista(
         nuevaLista: List<Movimiento>
     ) {
-        lista = nuevaLista
-        notifyDataSetChanged()
+        submitList(nuevaLista)
     }
 
     class ViewHolder(
@@ -62,17 +84,11 @@ class MovimientoAdapter(
         return ViewHolder(view)
     }
 
-    override fun getItemCount(): Int {
-        return lista.size
-    }
-
     override fun onBindViewHolder(
         holder: ViewHolder,
         position: Int
     ) {
-
-        val item =
-            lista[position]
+        val item = getItem(position)
 
         /* ==============================
            DATOS
@@ -99,12 +115,14 @@ class MovimientoAdapter(
         ============================== */
 
         val color =
-            if (item.tipo == "ingreso") {
-
+            if (
+                item.tipo.equals(
+                    other = "ingreso",
+                    ignoreCase = true
+                )
+            ) {
                 android.R.color.holo_green_dark
-
             } else {
-
                 android.R.color.holo_red_dark
             }
 

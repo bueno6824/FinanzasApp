@@ -3,9 +3,7 @@ package com.example.finanzasapp.util
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -14,6 +12,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.example.finanzasapp.MainActivity
 import com.example.finanzasapp.R
+import androidx.navigation.NavDeepLinkBuilder
 
 class NotificationWorker(
     context: Context,
@@ -89,24 +88,20 @@ class NotificationWorker(
                 Context.NOTIFICATION_SERVICE
             ) as NotificationManager
 
-        val intent =
-            Intent(
-                applicationContext,
-                MainActivity::class.java
-            ).apply {
-                flags =
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TASK
-            }
-
         val pendingIntent =
-            PendingIntent.getActivity(
-                applicationContext,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or
-                        PendingIntent.FLAG_IMMUTABLE
+            NavDeepLinkBuilder(
+                applicationContext
             )
+                .setGraph(
+                    R.navigation.nav_graph
+                )
+                .setDestination(
+                    R.id.agregarMovimientoFragment
+                )
+                .setComponentName(
+                    MainActivity::class.java
+                )
+                .createPendingIntent()
 
         val notification =
             NotificationCompat.Builder(

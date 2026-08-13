@@ -74,6 +74,18 @@ dependencies {
 // RecyclerView
     implementation("androidx.recyclerview:recyclerview:1.4.0")
 
+    val navigationVersion = "2.9.8"
+    implementation("androidx.navigation:navigation-fragment-ktx:$navigationVersion")
+
+    implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
+
+
+
+
+
+
+
+
 
 
     implementation("androidx.cardview:cardview:1.0.0")
@@ -98,8 +110,7 @@ dependencies {
 // Gráficas
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
-    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
-    implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+
     // Notificaciones
     implementation ("androidx.work:work-runtime-ktx:2.8.1")
     //Exportarcion a Excel

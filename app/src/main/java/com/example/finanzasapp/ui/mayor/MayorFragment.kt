@@ -22,6 +22,7 @@ import com.example.finanzasapp.data.model.Movimiento
 import com.example.finanzasapp.databinding.ActivityLibroMayorBinding
 import com.example.finanzasapp.ui.diario.MovimientoDetalleAdapter
 import com.example.finanzasapp.ui.resumen.ResumenAdapter
+import com.example.finanzasapp.ui.util.DateRange
 import com.example.finanzasapp.ui.util.ExcelExporter
 import com.example.finanzasapp.ui.util.applyTopSystemInset
 import com.example.finanzasapp.util.NotificationWorker
@@ -38,6 +39,11 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
     private var anioSeleccionado = Calendar.getInstance().get(Calendar.YEAR)
     private var mesSeleccionado: Int? = null
+
+
+    private var rangoActivo: DateRange? = null
+    private var nombreFiltroActivo = "Reporte"
+
 
     // 1. Declarar la variable
     private var _binding: ActivityLibroMayorBinding? = null
@@ -114,37 +120,77 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
         _binding = null
     }
 
-    private fun prepararExportacion() {
-        // 1. Obtenemos la lista actual de movimientos del ViewModel
-        val movimientosActuales = viewModel.movimientos.value ?: emptyList()
+    private fun aplicarRango(
+        rango: DateRange,
+        nombreFiltro: String
+    ) {
 
-        if (movimientosActuales.isEmpty()) {
-            Toast.makeText(requireContext(), "No hay datos para exportar", Toast.LENGTH_SHORT)
-                .show()
+        rangoActivo = rango
+        nombreFiltroActivo = nombreFiltro
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
+    }
+
+    private fun prepararExportacion() {
+
+        // 1. Obtenemos el rango que actualmente está activo en Libro Mayor
+        val rango = rangoActivo
+
+        if (rango == null) {
+            Toast.makeText(
+                requireContext(),
+                "No hay un filtro activo para exportar",
+                Toast.LENGTH_SHORT
+            ).show()
+
             return
         }
 
-        // 2. Obtenemos los valores seleccionados de tus Spinners
-        val anio = binding.spinnerAnio.selectedItem.toString().toInt()
-        val mesPosicion = binding.spinnerMes.selectedItemPosition // 0 = "Todos", 1 = "Enero"...
+        // 2. Obtenemos todos los movimientos actuales
+        val movimientosActuales =
+            viewModel.movimientos.value ?: emptyList()
 
-        // 3. Filtramos la lista para que el Excel coincida con lo que ves en pantalla
-        val listaFiltrada = movimientosActuales.filter { mov ->
-            val cal = Calendar.getInstance().apply { timeInMillis = mov.fecha }
-            val coincideAnio = cal.get(Calendar.YEAR) == anio
-            val coincideMes =
-                if (mesPosicion == 0) true else cal.get(Calendar.MONTH) == (mesPosicion - 1)
+        if (movimientosActuales.isEmpty()) {
+            Toast.makeText(
+                requireContext(),
+                "No hay datos para exportar",
+                Toast.LENGTH_SHORT
+            ).show()
 
-            coincideAnio && coincideMes
+            return
         }
 
-        // 4. Creamos un nombre dinámico para el archivo
-        val nombreMes = binding.spinnerMes.selectedItem.toString()
-        val nombreArchivo = "Reporte_${nombreMes}_$anio"
+        // 3. Filtramos usando EXACTAMENTE el mismo rango
+        // que actualmente está mostrando Libro Mayor
+        val listaFiltrada =
+            movimientosActuales.filter { movimiento ->
 
-        // 5. Llamamos a tu clase utilitaria
-        // CAMBIO AQUÍ: Llama a la función que SÍ tiene el contenido y usa MediaStore
-        ExcelExporter.exportarAMediastore(requireContext(), listaFiltrada, nombreArchivo)
+                movimiento.fecha in rango.desde..rango.hasta
+            }
+
+        if (listaFiltrada.isEmpty()) {
+            Toast.makeText(
+                requireContext(),
+                "No hay movimientos en el periodo seleccionado",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        // 4. Nombre dinámico del archivo
+        val nombreArchivo =
+            "Reporte_$nombreFiltroActivo"
+
+        // 5. Exportamos únicamente lo que corresponde al filtro activo
+        ExcelExporter.exportarAMediastore(
+            requireContext(),
+            listaFiltrada,
+            nombreArchivo
+        )
     }
 
     override fun onEdit(item: ResumenAdapter.ResumenItem) {
@@ -182,7 +228,7 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
                     dialog.dismiss()
                     val bundle = Bundle().apply { putSerializable("movimiento", movimiento) }
                     findNavController().navigate(
-                        R.id.action_mayorFragment_to_movimientosFragment,
+                        R.id.action_mayorFragment_to_agregarMovimientoFragment,
                         bundle
                     )
                 }
@@ -271,54 +317,61 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
     // --- Métodos de Filtro (Sin cambios en lógica) ---
     private fun actualizarFiltroGlobal() {
 
-        val rango =
-            if (mesSeleccionado == null) {
+        val rango: DateRange
+        val nombreFiltro: String
+
+        if (mesSeleccionado == null) {
+
+            rango =
                 DateRangeUtils.anio(
                     anioSeleccionado
                 )
-            } else {
+
+            nombreFiltro =
+                "Todo_$anioSeleccionado"
+
+        } else {
+
+            rango =
                 DateRangeUtils.mes(
                     anioSeleccionado,
                     mesSeleccionado!!
                 )
-            }
 
-        viewModel.actualizarFiltro(
-            rango.desde,
-            rango.hasta
+            val nombreMes =
+                binding.spinnerMes.selectedItem.toString()
+
+            nombreFiltro =
+                "${nombreMes}_$anioSeleccionado"
+        }
+
+        aplicarRango(
+            rango = rango,
+            nombreFiltro = nombreFiltro
         )
     }
 
     private fun aplicarFiltroHoy() {
 
-        val rango =
-            DateRangeUtils.hoy()
-
-        viewModel.actualizarFiltro(
-            rango.desde,
-            rango.hasta
+        aplicarRango(
+            rango = DateRangeUtils.hoy(),
+            nombreFiltro = "Hoy"
         )
     }
 
     private fun aplicarFiltroSemana() {
 
-        val rango =
-            DateRangeUtils.semanaActual()
-
-        viewModel.actualizarFiltro(
-            rango.desde,
-            rango.hasta
+        aplicarRango(
+            rango = DateRangeUtils.semanaActual(),
+            nombreFiltro = "Semana"
         )
     }
 
     private fun aplicarFiltroMesActual() {
 
-        val rango =
-            DateRangeUtils.mesActual()
-
-        viewModel.actualizarFiltro(
-            rango.desde,
-            rango.hasta
+        aplicarRango(
+            rango = DateRangeUtils.mesActual(),
+            nombreFiltro = "Mes_Actual"
         )
     }
 

@@ -27,8 +27,8 @@
         android:label="Libro Mayor">
 
         <action
-            android:id="@+id/action_mayorFragment_to_movimientosFragment"
-            app:destination="@id/movimientosFragment" />
+            android:id="@+id/action_mayorFragment_to_agregarMovimientoFragment"
+            app:destination="@id/agregarMovimientoFragment" />
 
     </fragment>
 

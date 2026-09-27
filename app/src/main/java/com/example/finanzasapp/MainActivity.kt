@@ -1,48 +1,163 @@
 package com.example.finanzasapp
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.navigation.findNavController
+import androidx.core.content.ContextCompat
 import androidx.navigation.fragment.NavHostFragment
-import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.setupWithNavController
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.example.finanzasapp.util.NotificationWorker
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
-    override fun onCreate(savedInstanceState : Bundle?) {
-        // Aplicar el tema guardado antes del super.onCreate
-        val temaGuardado = obtenerTemaDeSharedPrefs() // Recupera el Int guardado (0, 1 o 2)
-        when(temaGuardado) {
-            0 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            1 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+    private val solicitarPermisoNotificaciones =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { concedido ->
+
+            if (concedido) {
+                programarRecordatorio()
+            }
         }
 
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
+        aplicarTemaGuardado()
 
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHostFragment.navController
-        val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNav)
-        // Esto vincula el menú con el controlador y maneja la limpieza de la pila automáticamente
-        bottomNav.setupWithNavController(navController)
+        super.onCreate(savedInstanceState)
+
+        setContentView(
+            R.layout.activity_main
+        )
+
+        configurarNavegacion()
+
+        if (savedInstanceState == null) {
+            configurarNotificaciones()
+        }
     }
 
-    // Agrega esto en tu MainActivity.kt (fuera del onCreate)
+    private fun aplicarTemaGuardado() {
+        when (obtenerTemaDeSharedPrefs()) {
+            0 ->
+                AppCompatDelegate.setDefaultNightMode(
+                    AppCompatDelegate.MODE_NIGHT_NO
+                )
 
-    fun guardarPreferenciaTema(mode: Int) {
-        val sharedPreferences = getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
-        sharedPreferences.edit().putInt("theme_mode", mode).apply()
+            1 ->
+                AppCompatDelegate.setDefaultNightMode(
+                    AppCompatDelegate.MODE_NIGHT_YES
+                )
+
+            else ->
+                AppCompatDelegate.setDefaultNightMode(
+                    AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                )
+        }
+    }
+
+    private fun configurarNavegacion() {
+        val navHostFragment =
+            supportFragmentManager
+                .findFragmentById(
+                    R.id.nav_host_fragment
+                ) as NavHostFragment
+
+        val navController =
+            navHostFragment.navController
+
+        val bottomNav =
+            findViewById<BottomNavigationView>(
+                R.id.bottomNav
+            )
+
+        bottomNav.setupWithNavController(
+            navController
+        )
+    }
+
+    private fun configurarNotificaciones() {
+        NotificationWorker.crearCanal(
+            context = this
+        )
+
+        // Actualiza el recordatorio anterior de 3 horas
+        // para que funcione cada 24 horas.
+        programarRecordatorio()
+
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.TIRAMISU
+        ) {
+            val permisoConcedido =
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+
+            if (!permisoConcedido) {
+                solicitarPermisoNotificaciones.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            }
+        }
+    }
+
+    private fun programarRecordatorio() {
+        val request =
+            PeriodicWorkRequestBuilder<NotificationWorker>(
+                24,
+                TimeUnit.HOURS
+            ).build()
+
+        WorkManager
+            .getInstance(this)
+            .enqueueUniquePeriodicWork(
+                "RecordatorioDiario",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                request
+            )
+    }
+
+    fun guardarPreferenciaTema(
+        mode: Int
+    ) {
+        val sharedPreferences =
+            getSharedPreferences(
+                "Settings",
+                Context.MODE_PRIVATE
+            )
+
+        sharedPreferences
+            .edit()
+            .putInt(
+                "theme_mode",
+                mode
+            )
+            .apply()
     }
 
     private fun obtenerTemaDeSharedPrefs(): Int {
-        val sharedPreferences = getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
-        // Por defecto devolvemos 2 (Defecto del sistema)
-        return sharedPreferences.getInt("theme_mode", 2)
+        val sharedPreferences =
+            getSharedPreferences(
+                "Settings",
+                Context.MODE_PRIVATE
+            )
+
+        return sharedPreferences.getInt(
+            "theme_mode",
+            2
+        )
     }
-
-
-
 }

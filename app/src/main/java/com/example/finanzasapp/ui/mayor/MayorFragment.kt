@@ -1,7 +1,5 @@
 package com.example.finanzasapp.ui.mayor
 
-import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,19 +13,19 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.example.finanzasapp.R
 import com.example.finanzasapp.data.model.Movimiento
 import com.example.finanzasapp.databinding.ActivityLibroMayorBinding
 import com.example.finanzasapp.ui.diario.MovimientoDetalleAdapter
 import com.example.finanzasapp.ui.resumen.ResumenAdapter
+import com.example.finanzasapp.ui.util.DateRange
 import com.example.finanzasapp.ui.util.ExcelExporter
-import com.example.finanzasapp.util.NotificationWorker
+import com.example.finanzasapp.ui.util.applyTopSystemInset
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
+import com.example.finanzasapp.ui.util.DateRangeUtils
 import kotlinx.coroutines.launch
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
+import androidx.lifecycle.Observer
 
 class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.OnItemActionListener {
 
@@ -36,6 +34,11 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
     private var anioSeleccionado = Calendar.getInstance().get(Calendar.YEAR)
     private var mesSeleccionado: Int? = null
+
+
+    private var rangoActivo: DateRange? = null
+    private var nombreFiltroActivo = "Reporte"
+
 
     // 1. Declarar la variable
     private var _binding: ActivityLibroMayorBinding? = null
@@ -52,6 +55,7 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.root.applyTopSystemInset()
 
         val recycler = view.findViewById<RecyclerView>(R.id.recyclerMayor)
         val spinnerAnio = view.findViewById<Spinner>(R.id.spinnerAnio)
@@ -96,7 +100,6 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
         actualizarFiltroGlobal()
 
-        programarRecordatorio() // Esto activa la programación silenciosamente
 
         // Configurar el botón de Excel
         binding.btnExportarExcel.setOnClickListener {
@@ -111,37 +114,77 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
         _binding = null
     }
 
-    private fun prepararExportacion() {
-        // 1. Obtenemos la lista actual de movimientos del ViewModel
-        val movimientosActuales = viewModel.movimientos.value ?: emptyList()
+    private fun aplicarRango(
+        rango: DateRange,
+        nombreFiltro: String
+    ) {
 
-        if (movimientosActuales.isEmpty()) {
-            Toast.makeText(requireContext(), "No hay datos para exportar", Toast.LENGTH_SHORT)
-                .show()
+        rangoActivo = rango
+        nombreFiltroActivo = nombreFiltro
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
+    }
+
+    private fun prepararExportacion() {
+
+        // 1. Obtenemos el rango que actualmente está activo en Libro Mayor
+        val rango = rangoActivo
+
+        if (rango == null) {
+            Toast.makeText(
+                requireContext(),
+                "No hay un filtro activo para exportar",
+                Toast.LENGTH_SHORT
+            ).show()
+
             return
         }
 
-        // 2. Obtenemos los valores seleccionados de tus Spinners
-        val anio = binding.spinnerAnio.selectedItem.toString().toInt()
-        val mesPosicion = binding.spinnerMes.selectedItemPosition // 0 = "Todos", 1 = "Enero"...
+        // 2. Obtenemos todos los movimientos actuales
+        val movimientosActuales =
+            viewModel.movimientos.value ?: emptyList()
 
-        // 3. Filtramos la lista para que el Excel coincida con lo que ves en pantalla
-        val listaFiltrada = movimientosActuales.filter { mov ->
-            val cal = Calendar.getInstance().apply { timeInMillis = mov.fecha }
-            val coincideAnio = cal.get(Calendar.YEAR) == anio
-            val coincideMes =
-                if (mesPosicion == 0) true else cal.get(Calendar.MONTH) == (mesPosicion - 1)
+        if (movimientosActuales.isEmpty()) {
+            Toast.makeText(
+                requireContext(),
+                "No hay datos para exportar",
+                Toast.LENGTH_SHORT
+            ).show()
 
-            coincideAnio && coincideMes
+            return
         }
 
-        // 4. Creamos un nombre dinámico para el archivo
-        val nombreMes = binding.spinnerMes.selectedItem.toString()
-        val nombreArchivo = "Reporte_${nombreMes}_$anio"
+        // 3. Filtramos usando EXACTAMENTE el mismo rango
+        // que actualmente está mostrando Libro Mayor
+        val listaFiltrada =
+            movimientosActuales.filter { movimiento ->
 
-        // 5. Llamamos a tu clase utilitaria
-        // CAMBIO AQUÍ: Llama a la función que SÍ tiene el contenido y usa MediaStore
-        ExcelExporter.exportarAMediastore(requireContext(), listaFiltrada, nombreArchivo)
+                movimiento.fecha in rango.desde..rango.hasta
+            }
+
+        if (listaFiltrada.isEmpty()) {
+            Toast.makeText(
+                requireContext(),
+                "No hay movimientos en el periodo seleccionado",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        // 4. Nombre dinámico del archivo
+        val nombreArchivo =
+            "Reporte_$nombreFiltroActivo"
+
+        // 5. Exportamos únicamente lo que corresponde al filtro activo
+        ExcelExporter.exportarAMediastore(
+            requireContext(),
+            listaFiltrada,
+            nombreArchivo
+        )
     }
 
     override fun onEdit(item: ResumenAdapter.ResumenItem) {
@@ -152,58 +195,152 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
         mostrarDialogoSeleccion(item.categoria)
     }
 
-    private fun mostrarDialogoSeleccion(categoria: String) {
+    private fun mostrarDialogoSeleccion(
+        categoria: String
+    ) {
         val dialogView =
-            LayoutInflater.from(requireContext()).inflate(R.layout.dialog_lista_detalle, null)
-        val rvDetalle = dialogView.findViewById<RecyclerView>(R.id.rvDetalle)
-        val tvTitulo = dialogView.findViewById<TextView>(R.id.txtTituloDialogo)
+            LayoutInflater
+                .from(requireContext())
+                .inflate(
+                    R.layout.dialog_lista_detalle,
+                    null
+                )
 
-        tvTitulo?.text = "Movimientos: $categoria"
+        val rvDetalle =
+            dialogView.findViewById<RecyclerView>(
+                R.id.rvDetalle
+            )
 
-        val dialog = AlertDialog.Builder(requireContext(), R.style.CustomDialogTheme)
-            .setView(dialogView)
-            .create()
+        val tvTitulo =
+            dialogView.findViewById<TextView>(
+                R.id.txtTituloDialogo
+            )
 
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        tvTitulo?.text =
+            "Movimientos: $categoria"
+
+        val dialog =
+            AlertDialog.Builder(
+                requireContext(),
+                R.style.CustomDialogTheme
+            )
+                .setView(dialogView)
+                .create()
+
+        var navegandoAEdicion = false
+
+        val detalleAdapter =
+            MovimientoDetalleAdapter(
+                object :
+                    MovimientoDetalleAdapter.OnMovimientoClickListener {
+
+                    override fun onEdit(
+                        movimiento: Movimiento
+                    ) {
+                        navegandoAEdicion = true
+
+                        dialog.dismiss()
+
+                        val bundle =
+                            Bundle().apply {
+                                putInt(
+                                    "movimientoId",
+                                    movimiento.id
+                                )
+                            }
+
+                        findNavController().navigate(
+                            R.id.action_mayorFragment_to_agregarMovimientoFragment,
+                            bundle
+                        )
+                    }
+
+                    override fun onDelete(
+                        movimiento: Movimiento
+                    ) {
+                        AlertDialog.Builder(
+                            requireContext()
+                        )
+                            .setTitle("Confirmar")
+                            .setMessage(
+                                "¿Borrar '${movimiento.descripcion}'?"
+                            )
+                            .setPositiveButton("Sí") { _, _ ->
+                                viewModel.eliminar(
+                                    movimiento
+                                )
+                            }
+                            .setNegativeButton(
+                                "No",
+                                null
+                            )
+                            .show()
+                    }
+                }
+            )
+
+        rvDetalle.layoutManager =
+            LinearLayoutManager(
+                requireContext()
+            )
+
+        rvDetalle.adapter =
+            detalleAdapter
+
+        val movimientosObserver =
+            Observer<List<Movimiento>> { lista ->
+
+                val filtrados =
+                    lista.filter {
+                        it.categoria == categoria
+                    }
+
+                detalleAdapter.actualizar(
+                    filtrados
+                )
+
+                if (
+                    filtrados.isEmpty() &&
+                    dialog.isShowing
+                ) {
+                    dialog.dismiss()
+                }
+            }
 
         dialog.setOnDismissListener {
-            if (arguments?.containsKey("categoria_filtro") == true) {
-                arguments?.remove("categoria_filtro")
-                findNavController().popBackStack(R.id.dashboardFragment, false)
+
+            // El observador deja de existir al cerrar el diálogo.
+            viewModel.movimientos.removeObserver(
+                movimientosObserver
+            )
+
+            if (
+                !navegandoAEdicion &&
+                arguments?.containsKey(
+                    "categoria_filtro"
+                ) == true
+            ) {
+                arguments?.remove(
+                    "categoria_filtro"
+                )
+
+                findNavController().popBackStack(
+                    R.id.dashboardFragment,
+                    false
+                )
             }
         }
 
-        val detalleAdapter =
-            MovimientoDetalleAdapter(object : MovimientoDetalleAdapter.OnMovimientoClickListener {
-                override fun onEdit(movimiento: Movimiento) {
-                    dialog.dismiss()
-                    val bundle = Bundle().apply { putSerializable("movimiento", movimiento) }
-                    findNavController().navigate(
-                        R.id.action_mayorFragment_to_movimientosFragment,
-                        bundle
-                    )
-                }
-
-                override fun onDelete(movimiento: Movimiento) {
-                    AlertDialog.Builder(requireContext())
-                        .setTitle("Confirmar")
-                        .setMessage("¿Borrar '${movimiento.descripcion}'?")
-                        .setPositiveButton("Sí") { _, _ -> viewModel.eliminar(movimiento) }
-                        .setNegativeButton("No", null)
-                        .show()
-                }
-            })
-
-        rvDetalle.layoutManager = LinearLayoutManager(requireContext())
-        rvDetalle.adapter = detalleAdapter
-
-        viewModel.movimientos.observe(viewLifecycleOwner) { lista ->
-            val filtrados = lista.filter { it.categoria == categoria }
-            detalleAdapter.actualizar(filtrados)
-            if (filtrados.isEmpty()) dialog.dismiss()
-        }
-
         dialog.show()
+
+        dialog.window?.setBackgroundDrawableResource(
+            android.R.color.transparent
+        )
+
+        viewModel.movimientos.observe(
+            viewLifecycleOwner,
+            movimientosObserver
+        )
     }
 
     private fun configurarSpinners(spinnerAnio: Spinner, spinnerMes: Spinner) {
@@ -267,60 +404,63 @@ class MayorFragment : Fragment(R.layout.activity_libro_mayor), ResumenAdapter.On
 
     // --- Métodos de Filtro (Sin cambios en lógica) ---
     private fun actualizarFiltroGlobal() {
-        val cal = Calendar.getInstance()
-        val desde: Long;
-        val hasta: Long
+
+        val rango: DateRange
+        val nombreFiltro: String
+
         if (mesSeleccionado == null) {
-            cal.set(anioSeleccionado, 0, 1, 0, 0, 0); desde = cal.timeInMillis
-            cal.set(anioSeleccionado, 11, 31, 23, 59, 59); hasta = cal.timeInMillis
+
+            rango =
+                DateRangeUtils.anio(
+                    anioSeleccionado
+                )
+
+            nombreFiltro =
+                "Todo_$anioSeleccionado"
+
         } else {
-            cal.set(anioSeleccionado, mesSeleccionado!!, 1, 0, 0, 0); desde = cal.timeInMillis
-            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-            cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); hasta =
-                cal.timeInMillis
+
+            rango =
+                DateRangeUtils.mes(
+                    anioSeleccionado,
+                    mesSeleccionado!!
+                )
+
+            val nombreMes =
+                binding.spinnerMes.selectedItem.toString()
+
+            nombreFiltro =
+                "${nombreMes}_$anioSeleccionado"
         }
-        viewModel.actualizarFiltro(desde, hasta)
-    }
 
-    private fun aplicarFiltroHoy() {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        val d = cal.timeInMillis
-        cal.set(Calendar.HOUR_OF_DAY, 23);
-        val h = cal.timeInMillis
-        viewModel.actualizarFiltro(d, h)
-    }
-
-    private fun aplicarFiltroSemana() {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek);
-        val d = cal.timeInMillis
-        cal.add(Calendar.DAY_OF_WEEK, 6);
-        val h = cal.timeInMillis
-        viewModel.actualizarFiltro(d, h)
-    }
-
-    private fun aplicarFiltroMesActual() {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_MONTH, 1);
-        val d = cal.timeInMillis
-        cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
-        val h = cal.timeInMillis
-        viewModel.actualizarFiltro(d, h)
-    }
-
-    private fun programarRecordatorio() {
-        val request = PeriodicWorkRequestBuilder<NotificationWorker>(
-            8, TimeUnit.HOURS // Se ejecutará cada 8 horas
-        ).build()
-
-        WorkManager.getInstance(requireContext()).enqueueUniquePeriodicWork(
-            "RecordatorioDiario",
-            androidx.work.ExistingPeriodicWorkPolicy.KEEP, // Mantiene el programa si ya existe
-            request
+        aplicarRango(
+            rango = rango,
+            nombreFiltro = nombreFiltro
         )
     }
 
+    private fun aplicarFiltroHoy() {
 
+        aplicarRango(
+            rango = DateRangeUtils.hoy(),
+            nombreFiltro = "Hoy"
+        )
+    }
+
+    private fun aplicarFiltroSemana() {
+
+        aplicarRango(
+            rango = DateRangeUtils.semanaActual(),
+            nombreFiltro = "Semana"
+        )
+    }
+
+    private fun aplicarFiltroMesActual() {
+
+        aplicarRango(
+            rango = DateRangeUtils.mesActual(),
+            nombreFiltro = "Mes_Actual"
+        )
+    }
 
 }

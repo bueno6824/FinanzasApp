@@ -10,100 +10,317 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.finanzasapp.R
 import com.example.finanzasapp.data.model.Movimiento
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
+import kotlinx.coroutines.launch
 
-// ... tus imports actuales ...
-
-class AgregarMovimientoFragment : Fragment(R.layout.activity_agregar_movimiento) {
+class AgregarMovimientoFragment :
+    Fragment(R.layout.activity_agregar_movimiento) {
 
     private val viewModel: MovimientoViewModel by viewModels()
 
-    // Usamos el casting correcto para los nuevos inputs de Material
     private lateinit var etDescripcion: EditText
     private lateinit var etMonto: EditText
     private lateinit var spinnerCategoria: Spinner
     private lateinit var spinnerTipo: Spinner
     private lateinit var btnGuardar: Button
+    private lateinit var tvTitulo: TextView
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    /*
+     * Si es null:
+     * estamos agregando un movimiento nuevo.
+     *
+     * Si contiene un Movimiento:
+     * estamos editando uno existente.
+     */
+    private var movimientoExistente: Movimiento? = null
+
+    private val categorias = listOf(
+        "Trabajo",
+        "Comida",
+        "Transporte",
+        "Salud",
+        "Gustos",
+        "Otros"
+    )
+
+    private val tipos = listOf(
+        "ingreso",
+        "gasto"
+    )
+
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?
+    ) {
         super.onViewCreated(view, savedInstanceState)
 
-        etDescripcion = view.findViewById(R.id.etDescripcion)
-        etMonto = view.findViewById(R.id.etMonto)
-        spinnerCategoria = view.findViewById(R.id.spinnerCategoria)
-        spinnerTipo = view.findViewById(R.id.spinnerTipo)
-        btnGuardar = view.findViewById(R.id.btnGuardar)
-        val tvTitulo = view.findViewById<TextView>(R.id.tvTitulo)
+        /* ==============================
+           VISTAS
+        ============================== */
 
-        // Configurar Spinners
-        val categorias = listOf("Trabajo", "Comida", "Transporte", "Salud", "Gustos", "Otros")
-        spinnerCategoria.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, categorias)
+        etDescripcion =
+            view.findViewById(R.id.etDescripcion)
 
-        val tipos = listOf("ingreso", "gasto")
-        spinnerTipo.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, tipos)
+        etMonto =
+            view.findViewById(R.id.etMonto)
 
-        // Recuperar objeto para edición
-        val movimientoExistente = arguments?.getSerializable("movimiento") as? Movimiento
+        spinnerCategoria =
+            view.findViewById(R.id.spinnerCategoria)
 
-        movimientoExistente?.let {
-            tvTitulo.text = "Editar Movimiento" // Cambiamos el título si es edición
-            etDescripcion.setText(it.descripcion)
-            etMonto.setText(it.monto.toString())
+        spinnerTipo =
+            view.findViewById(R.id.spinnerTipo)
 
-            val indexCat = categorias.indexOf(it.categoria)
-            if (indexCat >= 0) spinnerCategoria.setSelection(indexCat)
+        btnGuardar =
+            view.findViewById(R.id.btnGuardar)
 
-            val indexTipo = tipos.indexOf(it.tipo)
-            if (indexTipo >= 0) spinnerTipo.setSelection(indexTipo)
-        }
+        tvTitulo =
+            view.findViewById(R.id.tvTitulo)
+
+        /* ==============================
+           SPINNERS
+        ============================== */
+
+        spinnerCategoria.adapter =
+            ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                categorias
+            )
+
+        spinnerTipo.adapter =
+            ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                tipos
+            )
+
+        /* ==============================
+           MODO EDICIÓN
+        ============================== */
+
+        cargarMovimientoParaEdicion()
+
+        /* ==============================
+           GUARDAR
+        ============================== */
 
         btnGuardar.setOnClickListener {
-            guardarMovimiento(movimientoExistente)
+
+            guardarMovimiento()
         }
     }
 
-    private fun guardarMovimiento(existente: Movimiento?) {
-        val desc = etDescripcion.text.toString().trim()
-        val montoTxt = etMonto.text.toString().trim()
+    /*
+     * Ahora recibimos solamente el ID.
+     *
+     * Ya NO recibimos el objeto Movimiento
+     * completo mediante Serializable.
+     */
+    private fun cargarMovimientoParaEdicion() {
 
-        if (desc.isEmpty() || montoTxt.isEmpty()) {
-            Toast.makeText(requireContext(), "Por favor, llena todos los campos", Toast.LENGTH_SHORT).show()
+        val movimientoId =
+            arguments?.getInt(
+                "movimientoId",
+                -1
+            ) ?: -1
+
+        /*
+         * -1 significa que no recibimos ningún ID.
+         *
+         * Por lo tanto estamos agregando
+         * un movimiento nuevo.
+         */
+        if (movimientoId == -1) {
             return
         }
 
-        val montoVal = montoTxt.toDoubleOrNull() ?: 0.0
-        if (montoVal <= 0) {
-            Toast.makeText(requireContext(), "El monto debe ser mayor a 0", Toast.LENGTH_SHORT).show()
+        /*
+         * Si recibimos un ID buscamos
+         * el movimiento directamente en Room.
+         */
+        viewLifecycleOwner.lifecycleScope.launch {
+
+            val movimiento =
+                viewModel.obtenerPorId(
+                    movimientoId
+                )
+
+            if (movimiento != null) {
+
+                movimientoExistente =
+                    movimiento
+
+                cargarMovimiento(
+                    movimiento
+                )
+            }
+        }
+    }
+
+    /*
+     * Coloca en pantalla los datos del
+     * movimiento recuperado desde Room.
+     */
+    private fun cargarMovimiento(
+        movimiento: Movimiento
+    ) {
+
+        tvTitulo.text =
+            "Editar Movimiento"
+
+        etDescripcion.setText(
+            movimiento.descripcion
+        )
+
+        etMonto.setText(
+            movimiento.monto.toString()
+        )
+
+        val indexCategoria =
+            categorias.indexOf(
+                movimiento.categoria
+            )
+
+        if (indexCategoria >= 0) {
+
+            spinnerCategoria.setSelection(
+                indexCategoria
+            )
+        }
+
+        val indexTipo =
+            tipos.indexOf(
+                movimiento.tipo
+            )
+
+        if (indexTipo >= 0) {
+
+            spinnerTipo.setSelection(
+                indexTipo
+            )
+        }
+    }
+
+    private fun guardarMovimiento() {
+
+        val descripcion =
+            etDescripcion
+                .text
+                .toString()
+                .trim()
+
+        val montoTexto =
+            etMonto
+                .text
+                .toString()
+                .trim()
+
+        /* ==============================
+           VALIDACIÓN
+        ============================== */
+
+        if (
+            descripcion.isEmpty() ||
+            montoTexto.isEmpty()
+        ) {
+
+            Toast.makeText(
+                requireContext(),
+                "Por favor, llena todos los campos",
+                Toast.LENGTH_SHORT
+            ).show()
+
             return
         }
+
+        val monto =
+            montoTexto.toDoubleOrNull()
+
+        if (
+            monto == null ||
+            monto <= 0
+        ) {
+
+            Toast.makeText(
+                requireContext(),
+                "El monto debe ser mayor a 0",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val categoria =
+            spinnerCategoria
+                .selectedItem
+                .toString()
+
+        val tipo =
+            spinnerTipo
+                .selectedItem
+                .toString()
+
+        /* ==============================
+           EDITAR O INSERTAR
+        ============================== */
+
+        val existente =
+            movimientoExistente
 
         if (existente != null) {
+
             // EDITAR
-            val actualizado = existente.copy(
-                descripcion = desc,
-                monto = montoVal,
-                categoria = spinnerCategoria.selectedItem.toString(),
-                tipo = spinnerTipo.selectedItem.toString()
-                // Mantenemos la fecha original e ID original
+
+            val actualizado =
+                existente.copy(
+                    descripcion = descripcion,
+                    monto = monto,
+                    categoria = categoria,
+                    tipo = tipo
+                )
+
+            viewModel.actualizar(
+                actualizado
             )
-            viewModel.actualizar(actualizado)
+
         } else {
+
             // INSERTAR NUEVO
-            val nuevo = Movimiento(
-                fecha = System.currentTimeMillis(),
-                categoria = spinnerCategoria.selectedItem.toString(),
-                descripcion = desc,
-                tipo = spinnerTipo.selectedItem.toString(),
-                monto = montoVal
+
+            val nuevo =
+                Movimiento(
+                    fecha =
+                        System.currentTimeMillis(),
+
+                    categoria =
+                        categoria,
+
+                    descripcion =
+                        descripcion,
+
+                    tipo =
+                        tipo,
+
+                    monto =
+                        monto
+                )
+
+            viewModel.insertar(
+                nuevo
             )
-            viewModel.insertar(nuevo)
         }
 
-        Toast.makeText(requireContext(), "¡Guardado con éxito!", Toast.LENGTH_SHORT).show()
-        findNavController().popBackStack()
+        Toast.makeText(
+            requireContext(),
+            "¡Guardado con éxito!",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        findNavController()
+            .popBackStack()
     }
 }
-

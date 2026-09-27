@@ -2,116 +2,253 @@ package com.example.finanzasapp.ui.util
 
 import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Log
-import android.widget.Toast
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import com.example.finanzasapp.data.model.Movimiento
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 object BackupManager {
-    private const val TAG = "BackupManager"
-        // EXPORTAR (Ahorra usa MediaStore como el ExcelExporter)
-    fun exportarBaseDeDatos(context: Context, nombreBaseDatos: String) {
-        try {
-            // Ya no cerramos la DB Room permite copiar el archivo mientras está abierto
-            // Si la app está escribiendo, Room usa bloqueos para evitar corrupción
-            val dbFile: File = context.getDatabasePath(nombreBaseDatos)
-            if (!dbFile.exists()) {
-                Toast.makeText(context, "No hay datos para respaldar", Toast.LENGTH_SHORT).show()
-                return
+
+    fun exportar(
+        context: Context,
+        movimientos: List<Movimiento>
+    ): Boolean {
+
+        return try {
+
+            val movimientosJson =
+                JSONArray()
+
+            movimientos.forEach { movimiento ->
+
+                val item =
+                    JSONObject().apply {
+
+                        put(
+                            "id",
+                            movimiento.id
+                        )
+
+                        put(
+                            "fecha",
+                            movimiento.fecha
+                        )
+
+                        put(
+                            "categoria",
+                            movimiento.categoria
+                        )
+
+                        put(
+                            "descripcion",
+                            movimiento.descripcion
+                        )
+
+                        put(
+                            "tipo",
+                            movimiento.tipo
+                        )
+
+                        put(
+                            "monto",
+                            movimiento.monto
+                        )
+                    }
+
+                movimientosJson.put(item)
             }
 
+            val backup =
+                JSONObject().apply {
 
-            val fecha = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val nombreBackup = "Backup_Finanzas_$fecha.db"
+                    put(
+                        "version",
+                        1
+                    )
 
-            // Usamos MediaStore (igual que en Excel)
-            val resolver = context.contentResolver
+                    put(
+                        "fechaBackup",
+                        System.currentTimeMillis()
+                    )
 
-            val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI
-            } else {
-                // Para android 9 o menos, este es un fallback pero necesitaras permisos WRITE_EXTERNAL_STORAGE
-                MediaStore.Files.getContentUri("external")
-            }
-
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, nombreBackup)
-                put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/FinanzasApp")
+                    put(
+                        "movimientos",
+                        movimientosJson
+                    )
                 }
-            }
 
-            val uri = resolver.insert(collection, contentValues)
+            val fecha =
+                SimpleDateFormat(
+                    "yyyyMMdd_HHmmss",
+                    Locale.getDefault()
+                ).format(Date())
 
-            uri?.let { outputUri ->
-                resolver.openOutputStream(outputUri)?.use { outputStream ->
-                    FileInputStream(dbFile).use { inputStream ->
-                        inputStream.copyTo(outputStream)
+            val nombreArchivo =
+                "Backup_Finanzas_$fecha.json"
+
+            val resolver =
+                context.contentResolver
+
+            val collection =
+                if (
+                    Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.Q
+                ) {
+
+                    MediaStore
+                        .Downloads
+                        .EXTERNAL_CONTENT_URI
+
+                } else {
+
+                    MediaStore.Files
+                        .getContentUri(
+                            "external"
+                        )
+                }
+
+            val values =
+                ContentValues().apply {
+
+                    put(
+                        MediaStore.MediaColumns.DISPLAY_NAME,
+                        nombreArchivo
+                    )
+
+                    put(
+                        MediaStore.MediaColumns.MIME_TYPE,
+                        "application/json"
+                    )
+
+                    if (
+                        Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.Q
+                    ) {
+
+                        put(
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                            "Download/FinanzasApp"
+                        )
                     }
                 }
-                Toast.makeText(
-                    context,
-                    "✅ Respaldo guardado en Descargas/FinanzasApp",
-                    Toast.LENGTH_LONG
-                ).show()
-                //Opcional: compartir
-                compartirBackup(context, outputUri)
-            } ?: run {
-                Toast.makeText(
-                    context,
-                    "❎ Error al crear el archivo en MediaStore",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error en exportar: ${e.message}", e)
-            Toast.makeText(context, "❎ Error: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
 
+            val uri =
+                resolver.insert(
+                    collection,
+                    values
+                ) ?: return false
 
-    // RESTAURAR (Corregida: borrará archivos viejos ANTES de copiar)
-    fun restaurarBaseDeDatos(context: Context, uriSeleccionada: Uri, nombreBaseDatos: String): Boolean {
-        return try {
-            // Cerramos la DB para liberar el archivo (Necesario al restaurar)
-            com.example.finanzasapp.data.local.AppDatabase.cerrarDatabase()
-            val dbFile = context.getDatabasePath(nombreBaseDatos)
+            resolver
+                .openOutputStream(uri)
+                ?.bufferedWriter()
+                ?.use { writer ->
 
-            // Eliminar los archivos viejos ANTES de copiar
-            if(dbFile.exists()){
-                dbFile.delete()
-            }
-
-            // Copiamos en nuevo archivo
-            context.contentResolver.openInputStream(uriSeleccionada)?.use { input ->
-                FileOutputStream(dbFile).use { output ->
-                    input.copyTo(output)
-                    output.flush()
+                    writer.write(
+                        backup.toString(2)
+                    )
                 }
-            }?: return false
+                ?: return false
 
             true
+
         } catch (e: Exception) {
-            Log.e(TAG, "Error al restaurar: ${e.message}", e)
+
             false
         }
     }
 
-    private fun compartirBackup(context: Context, uri: Uri) {
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/octet-stream"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    fun leerBackup(
+        context: Context,
+        uri: Uri
+    ): List<Movimiento>? {
+
+        return try {
+
+            val contenido =
+                context
+                    .contentResolver
+                    .openInputStream(uri)
+                    ?.bufferedReader()
+                    ?.use { reader ->
+
+                        reader.readText()
+                    }
+                    ?: return null
+
+            val backup =
+                JSONObject(contenido)
+
+            val version =
+                backup.optInt(
+                    "version",
+                    -1
+                )
+
+            if (version != 1) {
+                return null
+            }
+
+            val array =
+                backup.getJSONArray(
+                    "movimientos"
+                )
+
+            val movimientos =
+                mutableListOf<Movimiento>()
+
+            for (
+            i in 0 until array.length()
+            ) {
+
+                val item =
+                    array.getJSONObject(i)
+
+                movimientos.add(
+                    Movimiento(
+                        id =
+                            item.getInt("id"),
+
+                        fecha =
+                            item.getLong("fecha"),
+
+                        categoria =
+                            item.getString(
+                                "categoria"
+                            ),
+
+                        descripcion =
+                            item.getString(
+                                "descripcion"
+                            ),
+
+                        tipo =
+                            item.getString(
+                                "tipo"
+                            ),
+
+                        monto =
+                            item.getDouble(
+                                "monto"
+                            )
+                    )
+                )
+            }
+
+            movimientos
+
+        } catch (e: Exception) {
+
+            null
         }
-        context.startActivity(Intent.createChooser(shareIntent, "Guardar respaldo en:"))
     }
+
+
+
+
+
 }

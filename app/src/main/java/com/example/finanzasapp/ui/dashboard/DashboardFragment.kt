@@ -3,13 +3,12 @@ package com.example.finanzasapp.ui.dashboard
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Spinner
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
@@ -19,15 +18,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import androidx.navigation.navOptions
 import com.example.finanzasapp.MainActivity
 import com.example.finanzasapp.R
 import com.example.finanzasapp.databinding.ActivityDashboardBinding
 import com.example.finanzasapp.ui.util.BackupManager // 🔥 Asegúrate que la ruta sea correcta
+import com.example.finanzasapp.ui.util.applyTopSystemInset
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
 import com.github.mikephil.charting.animation.Easing
 import com.github.mikephil.charting.charts.PieChart
-import com.github.mikephil.charting.components.Legend
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
@@ -37,9 +35,10 @@ import com.github.mikephil.charting.highlight.Highlight
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
 import java.util.Calendar
-import java.util.Locale
+import com.example.finanzasapp.ui.util.DateRangeUtils
+import com.example.finanzasapp.ui.util.MoneyFormatter
+import java.time.LocalDate
 
 class DashboardFragment : Fragment(R.layout.activity_dashboard) {
 
@@ -70,16 +69,57 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        binding.root.applyTopSystemInset()
+
         // Inicializamos la gráfica que es la única que requiere configuración especial
         pieChart = binding.pieChart
 
         // --- CONFIGURACIÓN DE BOTONES (BACKUP, RESTAURAR, TEMA) ---
         binding.btnBackup.setOnClickListener {
-            BackupManager.exportarBaseDeDatos(requireContext(), "finanzas_db")
+
+            val movimientos =
+                viewModel.movimientos.value
+                    ?: emptyList()
+
+            if (movimientos.isEmpty()) {
+
+                Toast.makeText(
+                    requireContext(),
+                    "No hay movimientos para respaldar",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                return@setOnClickListener
+            }
+
+            val exito =
+                BackupManager.exportar(
+                    requireContext(),
+                    movimientos
+                )
+
+            if (exito) {
+
+                Toast.makeText(
+                    requireContext(),
+                    "✅ Respaldo creado en Descargas/FinanzasApp",
+                    Toast.LENGTH_LONG
+                ).show()
+
+            } else {
+
+                Toast.makeText(
+                    requireContext(),
+                    "❌ No se pudo crear el respaldo",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
 
+
+
         binding.btnRestaurar.setOnClickListener {
-            seleccionarBackupLauncher.launch("*/*")
+            seleccionarBackupLauncher.launch("application/json")
         }
 
         binding.btnConfigTema.setOnClickListener {
@@ -114,14 +154,45 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
         }
 
         // --- OBSERVADORES ---
-        viewModel.movimientos.observe(viewLifecycleOwner) { lista ->
-            val ingresos = lista.filter { it.tipo == "ingreso" }.sumOf { it.monto }
-            val gastos = lista.filter { it.tipo == "gasto" }.sumOf { it.monto }
-            val formato = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+        viewModel.movimientos.observe(
+            viewLifecycleOwner
+        ) { lista ->
 
-            binding.txtBalance.text = formato.format(ingresos - gastos)
-            binding.txtIngresos.text = formato.format(ingresos)
-            binding.txtGastos.text = formato.format(gastos)
+            val ingresos =
+                lista
+                    .filter {
+                        it.tipo == "ingreso"
+                    }
+                    .sumOf {
+                        it.monto
+                    }
+
+            val gastos =
+                lista
+                    .filter {
+                        it.tipo == "gasto"
+                    }
+                    .sumOf {
+                        it.monto
+                    }
+
+            val balance =
+                ingresos - gastos
+
+            binding.txtBalance.text =
+                MoneyFormatter.moneda(
+                    balance
+                )
+
+            binding.txtIngresos.text =
+                MoneyFormatter.moneda(
+                    ingresos
+                )
+
+            binding.txtGastos.text =
+                MoneyFormatter.moneda(
+                    gastos
+                )
         }
 
         configurarEstiloInicialGrafica()
@@ -135,43 +206,110 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
         }
     }
 
-    private fun confirmarRestauracion(uri: android.net.Uri) {
-        AlertDialog.Builder(requireContext())
-            .setTitle("¡Atención!")
-            .setMessage("Al restaurar, se borrarán todos los datos actuales. La app se reiniciará.\n\n¿Deseas continuar?")
-            .setPositiveButton("Restaurar") { _, _ ->
-                val exito = BackupManager.restaurarBaseDeDatos(requireContext(), uri, "finanzas_db")
-                if (exito) {
-                    android.os.Process.killProcess(android.os.Process.myPid())
-                } else {
-                    Toast.makeText(requireContext(), "Error al restaurar", Toast.LENGTH_SHORT).show()
+    private fun confirmarRestauracion(
+        uri: android.net.Uri
+    ) {
+
+        val movimientos =
+            BackupManager.leerBackup(
+                requireContext(),
+                uri
+            )
+
+        if (movimientos == null) {
+
+            Toast.makeText(
+                requireContext(),
+                "El archivo seleccionado no es un respaldo válido",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        AlertDialog
+            .Builder(requireContext())
+            .setTitle("Restaurar respaldo")
+            .setMessage(
+                "Se encontraron ${movimientos.size} movimientos.\n\n" +
+                        "Los datos actuales serán reemplazados. ¿Deseas continuar?"
+            )
+            .setPositiveButton(
+                "Restaurar"
+            ) { _, _ ->
+
+                viewModel.restaurarMovimientos(
+                    movimientos
+                ) { resultado ->
+
+                    resultado
+                        .onSuccess { cantidad ->
+
+                            context?.let { ctx ->
+
+                                Toast.makeText(
+                                    ctx,
+                                    "✅ $cantidad movimientos restaurados correctamente",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                        .onFailure { error ->
+
+                            Log.e(
+                                "FinanzasBackup",
+                                "Error al restaurar respaldo",
+                                error
+                            )
+
+                            context?.let { ctx ->
+
+                                Toast.makeText(
+                                    ctx,
+                                    "❌ Error al restaurar: ${error.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
                 }
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(
+                "Cancelar",
+                null
+            )
             .show()
     }
 
-    private fun enviarFiltroAlViewModel(position: Int) {
-        val mes = if (position == 0) null else position - 1
-        val cal = Calendar.getInstance()
-        if (mes == null) {
-            cal.set(Calendar.MONTH, 0)
-            cal.set(Calendar.DAY_OF_MONTH, 1)
-            val desde = cal.timeInMillis
-            cal.set(Calendar.MONTH, 11)
-            cal.set(Calendar.DAY_OF_MONTH, 31)
-            viewModel.actualizarFiltro(desde, cal.timeInMillis)
-        } else {
-            cal.set(Calendar.MONTH, mes)
-            cal.set(Calendar.DAY_OF_MONTH, 1)
-            val desde = cal.timeInMillis
-            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-            viewModel.actualizarFiltro(desde, cal.timeInMillis)
-        }
+    private fun enviarFiltroAlViewModel(
+        position: Int
+    ) {
+
+        val anioActual =
+            LocalDate.now().year
+
+        val rango =
+            if (position == 0) {
+
+                DateRangeUtils.anio(
+                    anioActual
+                )
+
+            } else {
+
+                DateRangeUtils.mes(
+                    anioActual,
+                    position - 1
+                )
+            }
+
+        viewModel.actualizarFiltro(
+            rango.desde,
+            rango.hasta
+        )
     }
 
     private fun refrescarGrafica() {
-        val resumenActual = viewModel.resumenFiltrado.value ?: return
+        val resumenActual = viewModel.resumenFiltrado.value
         val tipoSeleccionado = binding.spinnerTipo.selectedItem.toString()
 
         val entries = resumenActual.mapNotNull {
@@ -273,4 +411,7 @@ class DashboardFragment : Fragment(R.layout.activity_dashboard) {
         super.onResume()
         refrescarGrafica()
     }
+
+
+
 }

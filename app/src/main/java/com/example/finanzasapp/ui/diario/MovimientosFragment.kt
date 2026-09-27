@@ -9,6 +9,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.finanzasapp.R
+import com.example.finanzasapp.ui.util.applyTopSystemInset
 import com.example.finanzasapp.viewmodel.MovimientoViewModel
 
 class MovimientosFragment :
@@ -22,6 +23,7 @@ class MovimientosFragment :
     ) {
         super.onViewCreated(view, savedInstanceState)
 
+        view.applyTopSystemInset()
         val recycler =
             view.findViewById<RecyclerView>(R.id.recycler)
 
@@ -32,9 +34,9 @@ class MovimientosFragment :
             onEditar = { movimiento ->
 
                 val bundle = Bundle().apply {
-                    putSerializable(
-                        "movimiento",
-                        movimiento
+                    putInt(
+                        "movimientoId",
+                        movimiento.id
                     )
                 }
 

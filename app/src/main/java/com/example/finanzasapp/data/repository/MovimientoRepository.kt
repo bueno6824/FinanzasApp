@@ -12,6 +12,7 @@ class MovimientoRepository (private val dao:MovimientoDao){
         dao.insertar(movimiento)
 
     }
+
     suspend fun actualizar(movimiento: Movimiento){
         dao.actualizar(movimiento)
     }
@@ -23,6 +24,27 @@ class MovimientoRepository (private val dao:MovimientoDao){
     suspend fun eliminarPorCategoria(nombreCategoria: String) {
         dao.eliminarPorCategoria(nombreCategoria)
     }
+
+    suspend fun obtenerPorId(id: Int): Movimiento? {
+        return dao.obtenerPorId(id)
+    }
+
+    suspend fun insertarTodos(
+        movimientos: List<Movimiento>
+    ) {
+        dao.insertarTodos(movimientos)
+    }
+
+    suspend fun eliminarTodos() {
+        dao.eliminarTodos()
+    }
+
+    suspend fun restaurarMovimientos(
+        movimientos: List<Movimiento>
+    ) {
+        dao.reemplazarTodos(movimientos)
+    }
+
 
 
 }
